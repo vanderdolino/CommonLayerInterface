@@ -7,6 +7,7 @@ namespace MyApp // Note: actual namespace depends on the project name.
     {
         static void Main(string[] args)
         {
+            
             var file = CommonLayerInterfaceFactory.CreateCommonLayerInterfaceFile("sample files\\box_cli_ascii.cli");
             // required parameters
             Console.WriteLine($"FileType: {file.Header.FileType}");
@@ -20,6 +21,14 @@ namespace MyApp // Note: actual namespace depends on the project name.
             foreach (var label in file.Header.Labels)
                 Console.WriteLine($"Label: {label}");
             Console.WriteLine($"UserData: {file.Header.UserData}");
+            foreach (var model in file.Geometry.Models)
+            {
+                Console.WriteLine($"Model ID: {model.ID}, Layers: {model.Layers.Count}");
+                foreach (var layer in model.Layers)
+                {
+                    Console.WriteLine($"Layer Z: {layer.Z}, Area: {layer.Area}, Perimiter: {layer.Perimiter}");
+                }
+            }
             Console.ReadLine();
         }
     }
