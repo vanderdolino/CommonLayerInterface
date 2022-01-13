@@ -150,13 +150,13 @@ namespace CommonLayerInterface.Utils
         private static Geometry GetGeometry(string fileContents, Header header)
         {
             Geometry geometry = null;
-            
+
             switch (header.FileType)
             {
-                case FileType.Ascii :
+                case FileType.Ascii:
                     geometry = GetGeometryAscii(fileContents);
                     break;
-                case FileType.Binary :
+                case FileType.Binary:
                     geometry = GetGeometryBinary(fileContents);
                     break;
             }
@@ -168,46 +168,45 @@ namespace CommonLayerInterface.Utils
             Geometry geometry = new();
             var geometrySection = fileContents.Substring(fileContents.IndexOf(GEOMETRYSTART_TOKEN), fileContents.IndexOf(GEOMETRYEND_TOKEN) - fileContents.IndexOf(GEOMETRYSTART_TOKEN)).Split(Environment.NewLine);
             var models = new List<Model>();
-            var layers = new List<Layer>();
-            for(int i = 0; i < geometrySection.Length; i++)
+            for (int i = 0; i < geometrySection.Length; i++)
             {
-                if(geometrySection[i].StartsWith(LAYER_TOKEN))
+                if (geometrySection[i].StartsWith(LAYER_TOKEN))
                 {
                     var z = short.Parse(geometrySection[i].Split("/")[1]);
-                    // var layer = new Layer(z);
                     i++;
-                    if(geometrySection[i].StartsWith(POLYLINE_TOKEN))
+                    while (geometrySection[i].StartsWith(POLYLINE_TOKEN) || geometrySection[i].StartsWith(HATCHES_TOKEN))
                     {
-                        var polyLine = new PolyLine();
-                        var points = new List<Point2D>();
-                        var args = geometrySection[i].Split("/")[1].Split(",");
-                        var id = short.Parse(args[0]);
-                        var dir = (Direction)int.Parse(args[1]);
-                        var n = int.Parse(args[2]);
-                        for(int j = 0; j < 2 * n; j += 2)
-                            points.Add(new Point2D(float.Parse(args[j + 3]), float.Parse(args[j + 4])));
-                        polyLine.Direction = dir;
-                        polyLine.Points = points;
-                        var model = models.SingleOrDefault(m => m.ID == id);
-                        if (model == null)
+                        if (geometrySection[i].StartsWith(POLYLINE_TOKEN))
                         {
-                            model = new Model(id);
-                            model.Layers = new List<Layer>();
-                            models.Add(model);
+                            var polyLine = new PolyLine();
+                            var points = new List<Point2D>();
+                            var args = geometrySection[i].Split("/")[1].Split(",");
+                            var id = short.Parse(args[0]);
+                            var dir = (Direction)int.Parse(args[1]);
+                            var n = int.Parse(args[2]);
+                            for (int j = 0; j < 2 * n; j += 2)
+                                points.Add(new Point2D(float.Parse(args[j + 3]), float.Parse(args[j + 4])));
+                            polyLine.Direction = dir;
+                            polyLine.Points = points;
+                            var model = models.SingleOrDefault(m => m.ID == id);
+                            if (model == null)
+                            {
+                                model = new Model(id);
+                                models.Add(model);
+                            }
+                            var layer = model.Layers.SingleOrDefault(l => l.Z == z);
+                            if (layer == null)
+                            {
+                                layer = new Layer(z);
+                                model.Layers.Add(layer);
+                            }
+                            layer.PolyLines.Add(polyLine);
                         }
-                        var layer = model.Layers.SingleOrDefault(l => l.Z == z);
-                        if(layer == null)
+                        if (geometrySection[i].StartsWith(HATCHES_TOKEN))
                         {
-                            layer = new Layer(z);
-                            layer.PolyLines = new List<PolyLine>();
-                            model.Layers.Add(layer);
+                            Console.WriteLine("Hatch found!");
                         }
-                        layer.PolyLines.Add(polyLine);
-                                
-                    }
-                    if (geometrySection[i].StartsWith(HATCHES_TOKEN))
-                    {
-                        Console.WriteLine("Hatch found!");
+                        i++;
                     }
                     i--;
                 }

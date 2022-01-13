@@ -35,7 +35,7 @@ namespace CommonLayerInterface.Utils
         public DateOnly? Date { get; set; }
         public short? Layers { get; set; }
         public Dimension Dimension { get; set; }
-        public bool Align { get; set; } = false; 
+        public bool Align { get; set; } = false;
         public IEnumerable<Label> Labels { get; set; }
         public UserData UserData { get; set; }
     }
@@ -50,12 +50,12 @@ namespace CommonLayerInterface.Utils
         public Model(short iD) => ID = iD;
 
         public short ID { get; set; }
-        public List<Layer> Layers { get; set; }
+        public List<Layer> Layers { get; set; } = new List<Layer>();
     }
 
     public class Layer
     {
-        private List<PolyLine> polyLines;
+        private List<PolyLine> polyLines = new List<PolyLine>();
 
         public Layer() { }
         public Layer(short z) => Z = z;
@@ -78,7 +78,7 @@ namespace CommonLayerInterface.Utils
         {
             get
             {
-                if(float.IsNaN(area))
+                if (float.IsNaN(area))
                     area = PolyLines.Sum(p => p.Area);
                 return area;
             }
@@ -95,14 +95,14 @@ namespace CommonLayerInterface.Utils
         }
     }
 
-    public class PolyLine 
+    public class PolyLine
     {
         protected List<Point2D> points;
-        public List<Point2D> Points 
+        public List<Point2D> Points
         {
-            get 
+            get
             {
-                return Points;
+                return points;
             }
             set
             {
@@ -116,23 +116,16 @@ namespace CommonLayerInterface.Utils
         private float area = float.NaN;
         private float perimeter = float.NaN;
         public float Area
-        { 
+        {
             get
             {
                 if (float.IsNaN(area))
                 {
                     short n = N;
-                    float sum = 0;
-                    for (int i = 0; i < points.Count; i++)
-                        sum += points[i].X * points[(i + 1) % n].Y - points[(i + 1) % n].X * points[i].Y;
-                    float multiplier;
-                    if (Direction == Direction.Clockwise)
-                        multiplier = -1;
-                    else if (Direction == Direction.CounterClockwise)
-                        multiplier = 1;
-                    else
-                        multiplier = 0;
-                    area = multiplier * sum / 2;
+                    float multiplier = 0;
+                    if (Direction == Direction.Clockwise) multiplier = -1;
+                    else if (Direction == Direction.CounterClockwise) multiplier = 1;
+                    area = multiplier / 2 * points.Select((p, i) => points[i].X * points[(i + 1) % n].Y - points[(i + 1) % n].X * points[i].Y).Sum();
                 }
                 return area;
             }
@@ -144,12 +137,7 @@ namespace CommonLayerInterface.Utils
                 if (float.IsNaN(perimeter))
                 {
                     short n = N;
-                    float sum = 0;
-                    for (int i = 0; i < points.Count; i++)
-                    {
-                        sum += (float)Math.Sqrt(Math.Pow(points[(i + 1) % n].Y - points[i].Y, 2) + Math.Pow(points[(i + 1) % n].X - points[i].X, 2));
-                    }
-                    perimeter = sum;
+                    perimeter = points.Select((p, i) => (float)Math.Sqrt(Math.Pow(points[(i + 1) % n].Y - points[i].Y, 2) + Math.Pow(points[(i + 1) % n].X - points[i].X, 2))).Sum();
                 }
                 return perimeter;
             }
@@ -163,7 +151,7 @@ namespace CommonLayerInterface.Utils
         public short N { get { return (short)(points?.Count ?? 0); } }
     }
 
-    public enum Direction { Clockwise = 0, CounterClockwise = 1, OpenLine = 2}
+    public enum Direction { Clockwise = 0, CounterClockwise = 1, OpenLine = 2 }
 
     public enum FileType { Ascii = 0, Binary = 1 }
 
@@ -244,12 +232,12 @@ namespace CommonLayerInterface.Utils
 
     public class CliFileFormatException : Exception
     {
-        public CliFileFormatException() 
+        public CliFileFormatException()
             : base() { }
-        public CliFileFormatException(string message) 
+        public CliFileFormatException(string message)
             : base(message) { }
-        public CliFileFormatException(string message, Exception innerException) 
-            : base(message, innerException) {  }
+        public CliFileFormatException(string message, Exception innerException)
+            : base(message, innerException) { }
     }
 
 }
