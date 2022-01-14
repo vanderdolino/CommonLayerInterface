@@ -6,24 +6,25 @@ using System.Threading.Tasks;
 
 namespace CommonLayerInterface.Utils
 {
+    public static class Extensions
+    {
+        public static float Round(this float input)
+        {
+            return (float)Math.Round(input, 3);
+        }
+    }
 
-    public class AsciiCommonLayerInterfaceFile : ICommonLayerInterfaceFile
+    public class CommonLayerInterfaceFile //: ICommonLayerInterfaceFile
     {
         public Header Header { get; set; }
         public Geometry Geometry { get; set; }
     }
 
-    public class BinaryCommonLayerInterfaceFile : ICommonLayerInterfaceFile
-    {
-        public Header Header { get; set; }
-        public Geometry Geometry { get; set; }
-    }
-
-    public interface ICommonLayerInterfaceFile
-    {
-        Header Header { get; set; }
-        Geometry Geometry { get; set; }
-    }
+    //public interface ICommonLayerInterfaceFile
+    //{
+    //    Header Header { get; set; }
+    //    Geometry Geometry { get; set; }
+    //}
 
     public class Header
     {
@@ -58,8 +59,8 @@ namespace CommonLayerInterface.Utils
         private List<PolyLine> polyLines = new List<PolyLine>();
 
         public Layer() { }
-        public Layer(short z) => Z = z;
-        public short Z { get; set; }
+        public Layer(float z) => Z = (float)Math.Round(z, 3);
+        public float Z { get; set; }
         private float area = float.NaN;
         private float perimiter = float.NaN;
         public List<PolyLine> PolyLines
@@ -74,6 +75,7 @@ namespace CommonLayerInterface.Utils
                 area = float.NaN;
             }
         }
+        public List<Hatch> Hatches { get; set; }
         public float Area
         {
             get
@@ -83,7 +85,6 @@ namespace CommonLayerInterface.Utils
                 return area;
             }
         }
-
         public float Perimiter
         {
             get
@@ -97,8 +98,8 @@ namespace CommonLayerInterface.Utils
 
     public class PolyLine
     {
-        protected List<Point2D> points;
-        public List<Point2D> Points
+        protected List<Point2D> points = new();
+        public IEnumerable<Point2D> Points
         {
             get
             {
@@ -106,10 +107,16 @@ namespace CommonLayerInterface.Utils
             }
             set
             {
-                points = value;
+                points = value.ToList();
                 area = float.NaN;
                 perimeter = float.NaN;
             }
+        }
+        public void AddPoint(Point2D point)
+        {
+            points.Add(point);
+            area = float.NaN;
+            perimeter = float.NaN;
         }
         public Direction Direction { get; set; }
         public short N { get { return (short)(points?.Count ?? 0); } }
@@ -123,7 +130,7 @@ namespace CommonLayerInterface.Utils
                 {
                     short n = N;
                     float multiplier = 0;
-                    if (Direction == Direction.Clockwise) multiplier = -1;
+                    if (Direction == Direction.Clockwise) multiplier = 1;
                     else if (Direction == Direction.CounterClockwise) multiplier = 1;
                     area = multiplier / 2 * points.Select((p, i) => points[i].X * points[(i + 1) % n].Y - points[(i + 1) % n].X * points[i].Y).Sum();
                 }
@@ -146,8 +153,18 @@ namespace CommonLayerInterface.Utils
 
     public class Hatch
     {
-        protected List<PointHatch> points;
-        public virtual List<PointHatch> Points { get; set; }
+        protected List<PointHatch> points = new();
+        public IEnumerable<PointHatch> Points
+        {
+            get 
+            { 
+                return points; 
+            }
+            set
+            {
+                points = value.ToList();
+            }
+        }
         public short N { get { return (short)(points?.Count ?? 0); } }
     }
 
