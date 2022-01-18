@@ -24,40 +24,62 @@ namespace CommonLayerInterface.Utils
 
         public static CommonLayerInterfaceFile CreateCommonLayerInterfaceFile(string filename)
         {
-            CommonLayerInterfaceFile result = new();
-            //string fileContents;
-            using (FileStream stream = new FileStream(filename, FileMode.Open))
-            {
-                
-                result.Header = getHeader(stream);
-                //result.Geometry = GetGeometry(fileContents, result.Header);
-            }
-            return result;
+            //CommonLayerInterfaceFile result = new();
+            //using (FileStream stream = new FileStream(filename, FileMode.Open))
+            //{
+            //    result.Header = getHeader(stream);
+            //    result.Geometry = GetGeometry(stream, result.Header);
+            //}
+            //return result;
+            return readFile(filename);
         }
 
-        private static Header getHeader(Stream stream)
+        private static CommonLayerInterfaceFile readFile(string filename)
         {
-            var header = new Header();
-            
-            List<string> headerSection = new();
+            var result = new CommonLayerInterfaceFile();
+            long position;
 
-            using (StreamReader streamReader = new StreamReader(stream))
+            var header = new Header();
+
+            List<string> headerSection = new();
+            using (var stream = new FileStream(filename, FileMode.Open))
             {
-                do
+                using (var streamReader = new StreamReader(stream))
                 {
-                    headerSection.Add(streamReader.ReadLine());
-                } while (!headerSection.Last().StartsWith(HEADEREND_TOKEN));
+                    do
+                    {
+                        position = stream.Position;
+                        headerSection.Add(streamReader.ReadLine());
+                    } while (!headerSection.Last().StartsWith(HEADEREND_TOKEN));
+                    //position += (HEADEREND_TOKEN.Length * 8);
+                    position += (HEADEREND_TOKEN.Length * streamReader.CurrentEncoding.GetByteCount("a") * 8);
+                    //if (streamReader.Peek() == 10) position += 1;
+                    //position /= 8;
+
+                }
+                using (var reader = new BinaryReader(stream))
+                {
+                    var chars = new List<char>();
+                    if(chars.Count() >= HEADEREND_TOKEN.Length && new string(chars.TakeLast(HEADEREND_TOKEN.Length).ToArray()) == HEADEREND_TOKEN)
+                    {
+                        // check for new line,
+                        // end
+                    }
+                    var c = reader.ReadChar();
+                    if (c == '\n')
+                    {
+                        headerSection.Add(new string(chars.ToArray()));
+                        chars.Clear();
+                    }
+
+                }
             }
 
-            // headerSection = fileContents.Substring(HEADERSTART_TOKEN.Length, fileContents.IndexOf(HEADEREND_TOKEN)).Split(new[]{"\n", "\r", Environment.NewLine}, StringSplitOptions.RemoveEmptyEntries);
             //// required properties
             // binary / ascii
-            if (headerSection.Contains(BINARY_TOKEN))
-                header.FileType = FileType.Binary;
-            else if (headerSection.Contains(ASCII_TOKEN))
-                header.FileType = FileType.Ascii;
-            else
-                throw new CliFileFormatException("Header has missing or invalid binary / ascii declaration");
+            if (headerSection.Contains(BINARY_TOKEN)) header.FileType = FileType.Binary;
+            else if (headerSection.Contains(ASCII_TOKEN)) header.FileType = FileType.Ascii;
+            else throw new CliFileFormatException("Header has missing or invalid binary / ascii declaration");
             // units
             try
             {
@@ -80,7 +102,6 @@ namespace CommonLayerInterface.Utils
             // date
             var dateSection = headerSection.SingleOrDefault(s => s.StartsWith(DATE_TOKEN));
             if (dateSection != null)
-            {
                 try
                 {
                     var dateValue = dateSection.Split("/")[1];
@@ -93,11 +114,9 @@ namespace CommonLayerInterface.Utils
                 {
                     throw new CliFileFormatException("Header has invalid date declaration");
                 }
-            }
             // dimension
             var dimensionSection = headerSection.SingleOrDefault(s => s.StartsWith(DIMENSION_TOKEN));
             if (dimensionSection != null)
-            {
                 try
                 {
                     var dimensions = dimensionSection.Split("/")[1].Split(",").Select(s => float.Parse(s)).ToArray();
@@ -109,7 +128,6 @@ namespace CommonLayerInterface.Utils
                 {
                     throw new CliFileFormatException("Header has invalid dimension declaration");
                 }
-            }
             // layers
             var layersSection = headerSection.SingleOrDefault(s => s.StartsWith(LAYERS_TOKEN));
             if (layersSection != null)
@@ -141,7 +159,6 @@ namespace CommonLayerInterface.Utils
             // user-data
             var userDataSection = headerSection.SingleOrDefault(s => s.StartsWith(USERDATA_TOKEN));
             if (userDataSection != null)
-            {
                 try
                 {
                     var userDatas = userDataSection.Split("/")[1].Split(",").ToArray();
@@ -151,32 +168,351 @@ namespace CommonLayerInterface.Utils
                 {
                     throw new CliFileFormatException("Header has invalid user data declaration");
                 }
-            }
-            return header;
-        }
-
-        private static Geometry GetGeometry(string fileContents, Header header)
-        {
-            Geometry geometry = null;
+            result.Header = header;
 
             switch (header.FileType)
             {
                 case FileType.Ascii:
-                    geometry = GetGeometryAscii(fileContents);
+                    {
+                        Geometry geometry = new();
+                        List<string> geometrySection = new List<string>();
+                        using (var stream = new FileStream(filename, FileMode.Open))
+                        {
+                            stream.Position = position;
+                            using (var streamReader = new StreamReader(stream))
+                            {
+                                do
+                                {
+                                    geometrySection.Add(streamReader.ReadLine());
+                                } while (!geometrySection.Last().StartsWith(GEOMETRYEND_TOKEN));
+                                position = stream.Position;
+                            }
+                        }
+                        var models = new List<Model>();
+                        for (int i = 0; i < geometrySection.Count; i++)
+                        {
+                            if (geometrySection[i].StartsWith(LAYER_TOKEN))
+                            {
+                                var z = float.Parse(geometrySection[i].Split("/")[1]);
+                                i++;
+                                while (geometrySection[i].StartsWith(POLYLINE_TOKEN) || geometrySection[i].StartsWith(HATCHES_TOKEN))
+                                {
+                                    if (geometrySection[i].StartsWith(POLYLINE_TOKEN))
+                                    {
+                                        var polyLine = new PolyLine();
+                                        var points = new List<Point2D>();
+                                        var args = geometrySection[i].Split("/")[1].Split(",");
+                                        var id = short.Parse(args[0]);
+                                        var dir = (Direction)int.Parse(args[1]);
+                                        var n = int.Parse(args[2]);
+                                        for (int j = 0; j < 2 * n; j += 2)
+                                            points.Add(new Point2D(float.Parse(args[j + 3]), float.Parse(args[j + 4])));
+                                        polyLine.Direction = dir;
+                                        polyLine.Points = points;
+                                        var model = models.SingleOrDefault(m => m.ID == id);
+                                        if (model == null)
+                                        {
+                                            model = new Model(id);
+                                            models.Add(model);
+                                        }
+                                        var layer = model.Layers.SingleOrDefault(l => l.Z == z);
+                                        if (layer == null)
+                                        {
+                                            layer = new Layer(z);
+                                            model.Layers.Add(layer);
+                                        }
+                                        layer.PolyLines.Add(polyLine);
+                                    }
+                                    if (geometrySection[i].StartsWith(HATCHES_TOKEN))
+                                    {
+                                        var hatch = new Hatch();
+                                        var points = new List<PointHatch>();
+                                        var args = geometrySection[i].Split("/")[1].Split(",");
+                                        var id = short.Parse(args[0]);
+                                        var n = int.Parse(args[1]);
+                                        for (int j = 0; j < 4 * n; j += 4)
+                                            points.Add(new PointHatch(
+                                                float.Parse(args[j + 2]),
+                                                float.Parse(args[j + 3]),
+                                                float.Parse(args[j + 4]),
+                                                float.Parse(args[j + 5])));
+                                        hatch.Points = points;
+                                        var model = models.SingleOrDefault(m => m.ID == id);
+                                        if (model == null)
+                                        {
+                                            model = new Model(id);
+                                            models.Add(model);
+                                        }
+                                        var layer = model.Layers.SingleOrDefault(l => l.Z == z);
+                                        if (layer == null)
+                                        {
+                                            layer = new Layer(z);
+                                            model.Layers.Add(layer);
+                                        }
+                                        layer.Hatches.Add(hatch);
+                                    }
+                                    i++;
+                                }
+                                i--;
+                            }
+                        }
+                        geometry.Models = models;
+                        result.Geometry = geometry;
+                    }
                     break;
                 case FileType.Binary:
-                    geometry = GetGeometryBinary(fileContents);
+                    {
+                        Geometry geometry = new();
+                        var models = new List<Model>();
+                        Layer layer;
+                        Model model;
+
+                        //var headerEndLocation = fileContents.IndexOf(HEADEREND_TOKEN) + HEADEREND_TOKEN.Length;
+                        //using (var fs = new FileStream("sample files\\VulcanFormsSamplePartA.cli", FileMode.Open))
+                        using (var stream = new FileStream(filename, FileMode.Open))
+                        {
+                            stream.Position = position;
+                            using (var reader = new BinaryReader(stream))
+                            {
+                                float z = 0; // it appears that polylines can exist without a layer designation, so assume 0 is the surface height
+                                //reader.BaseStream.Position = headerEndLocation;
+                                do
+                                {
+                                    var command = reader.ReadUInt16();
+                                    switch (command)
+                                    {
+                                        case 10: // newline
+                                            break;
+                                        case 127: // Layer 4B
+                                            z = reader.ReadSingle();
+                                            break;
+                                        case 128: // Layer 2B
+                                            z = reader.ReadUInt16();
+                                            break;
+                                        case 129: // PolyLine 2B 
+                                            break;
+                                        case 130: // PolyLine 4B
+                                            {
+                                                var polyLine = new PolyLine();
+                                                var points = new List<Point2D>();
+                                                var id = (short)reader.ReadInt32();
+                                                var dir = (Direction)reader.ReadInt32();
+                                                var n = reader.ReadInt32();
+                                                var args = Enumerable.Range(0, n * 2).Select(_ => reader.ReadSingle()).ToArray();
+                                                for (int j = 0; j < args.Length; j += 2)
+                                                    points.Add(new Point2D(args[j], args[j + 1]));
+                                                polyLine.Direction = dir;
+                                                polyLine.Points = points;
+                                                model = models.SingleOrDefault(m => m.ID == id);
+                                                if (model == null)
+                                                {
+                                                    model = new Model(id);
+                                                    models.Add(model);
+                                                }
+                                                layer = model.Layers.SingleOrDefault(l => l.Z.Round() == z.Round());
+                                                if (layer == null)
+                                                {
+                                                    layer = new Layer(z);
+                                                    model.Layers.Add(layer);
+                                                }
+                                                layer.PolyLines.Add(polyLine);
+                                            }
+                                            break;
+                                        case 131: // Hatches 2B
+                                            {
+                                                var polyLine = new PolyLine();
+                                                var points = new List<Point2D>();
+                                                var id = (short)reader.ReadUInt16();
+                                                var dir = (Direction)reader.ReadUInt16();
+                                                var n = reader.ReadUInt16();
+                                                var args = Enumerable.Range(0, n * 2).Select(_ => reader.ReadUInt16()).ToArray();
+                                                for (int j = 0; j < args.Length; j += 2)
+                                                    points.Add(new Point2D(args[j], args[j + 1]));
+                                                polyLine.Direction = dir;
+                                                polyLine.Points = points;
+                                                model = models.SingleOrDefault(m => m.ID == id);
+                                                if (model == null)
+                                                {
+                                                    model = new Model(id);
+                                                    models.Add(model);
+                                                }
+                                                layer = model.Layers.SingleOrDefault(l => l.Z.Round() == z.Round());
+                                                if (layer == null)
+                                                {
+                                                    layer = new Layer(z);
+                                                    model.Layers.Add(layer);
+                                                }
+                                                layer.PolyLines.Add(polyLine);
+                                            }
+                                            break;
+                                        case 132: // Hatches 4B
+                                            break;
+                                        default:
+                                            Console.WriteLine("unrecognized command!");
+                                            break;
+                                    }
+                                } while (reader.BaseStream.Position != reader.BaseStream.Length);
+                            }
+                        }
+                        geometry.Models = models;
+                        result.Geometry = geometry;
+                    }
                     break;
+                default:
+                    return null;
             }
-            return geometry;
+            return result;
         }
 
-        private static Geometry GetGeometryAscii(string fileContents)
+        private static Header getHeader(Stream stream)
+        {
+            var header = new Header();
+
+            List<string> headerSection = new();
+
+            var streamReader = new StreamReader(stream);
+            try
+            {
+                do
+                {
+                    headerSection.Add(streamReader.ReadLine());
+                } while (!headerSection.Last().StartsWith(HEADEREND_TOKEN));
+            }
+            finally
+            {
+                streamReader.Close();
+            }
+
+            //// required properties
+            // binary / ascii
+            if (headerSection.Contains(BINARY_TOKEN)) header.FileType = FileType.Binary;
+            else if (headerSection.Contains(ASCII_TOKEN)) header.FileType = FileType.Ascii;
+            else throw new CliFileFormatException("Header has missing or invalid binary / ascii declaration");
+            // units
+            try
+            {
+                header.Units = float.Parse(headerSection.Single(s => s.StartsWith(UNITS_TOKEN)).Split("/")[1]);
+            }
+            catch
+            {
+                throw new CliFileFormatException("Header has missing or invalid units declaration");
+            }
+            // version
+            try
+            {
+                header.Version = float.Parse(headerSection.Single(s => s.StartsWith(VERSION_TOKEN)).Split("/")[1]) / 100;
+            }
+            catch
+            {
+                throw new CliFileFormatException("Header has missing or invalid version declaration");
+            }
+            //// optional properties
+            // date
+            var dateSection = headerSection.SingleOrDefault(s => s.StartsWith(DATE_TOKEN));
+            if (dateSection != null)
+                try
+                {
+                    var dateValue = dateSection.Split("/")[1];
+                    if (DateTime.TryParseExact(dateValue, "ddMMyy", new CultureInfo("en-US"), DateTimeStyles.None, out DateTime value))
+                        header.Date = DateOnly.FromDateTime(value);
+                    else
+                        header.Date = null;
+                }
+                catch
+                {
+                    throw new CliFileFormatException("Header has invalid date declaration");
+                }
+            // dimension
+            var dimensionSection = headerSection.SingleOrDefault(s => s.StartsWith(DIMENSION_TOKEN));
+            if (dimensionSection != null)
+                try
+                {
+                    var dimensions = dimensionSection.Split("/")[1].Split(",").Select(s => float.Parse(s)).ToArray();
+                    header.Dimension = new Dimension(
+                        new Point3D(dimensions[0], dimensions[1], dimensions[2]),
+                        new Point3D(dimensions[3], dimensions[4], dimensions[5]));
+                }
+                catch
+                {
+                    throw new CliFileFormatException("Header has invalid dimension declaration");
+                }
+            // layers
+            var layersSection = headerSection.SingleOrDefault(s => s.StartsWith(LAYERS_TOKEN));
+            if (layersSection != null)
+                try
+                {
+                    header.Layers = short.Parse(layersSection.Split("/")[1]);
+                }
+                catch
+                {
+                    throw new CliFileFormatException("Header has invalid layers declaration");
+                }
+            // align
+            header.Align = headerSection.Contains(ALIGN_TOKEN);
+            // labels
+            var labelSections = headerSection.Where(s => s.StartsWith(LABEL_TOKEN));
+            if (labelSections.Any())
+                try
+                {
+                    header.Labels = labelSections.Select(s =>
+                    {
+                        var split = s.Split("/")[1].Split(",");
+                        return new Label() { ID = short.Parse(split[0]), Text = split[1] };
+                    });
+                }
+                catch
+                {
+                    throw new CliFileFormatException("Header has invalid label declaration");
+                }
+            // user-data
+            var userDataSection = headerSection.SingleOrDefault(s => s.StartsWith(USERDATA_TOKEN));
+            if (userDataSection != null)
+                try
+                {
+                    var userDatas = userDataSection.Split("/")[1].Split(",").ToArray();
+                    header.UserData = new UserData(userDatas[0], int.Parse(userDatas[1]), userDatas[2]);
+                }
+                catch
+                {
+                    throw new CliFileFormatException("Header has invalid user data declaration");
+                }
+            return header;
+        }
+
+        private static Geometry GetGeometry(Stream stream, Header header)
+        {
+            switch (header.FileType)
+            {
+                case FileType.Ascii:
+                    return GetGeometryAscii(stream);
+                case FileType.Binary:
+                    return GetGeometryBinary(stream);
+                default:
+                    return null;
+            }
+        }
+
+        private static Geometry GetGeometryAscii(Stream stream)
         {
             Geometry geometry = new();
-            var geometrySection = fileContents.Substring(fileContents.IndexOf(GEOMETRYSTART_TOKEN), fileContents.IndexOf(GEOMETRYEND_TOKEN) - fileContents.IndexOf(GEOMETRYSTART_TOKEN)).Split(Environment.NewLine);
+
+            List<string> geometrySection = new List<string>();
+
+            var streamReader = new StreamReader(stream);
+            try
+            {
+                do
+                {
+                    geometrySection.Add(streamReader.ReadLine());
+                } while (!geometrySection.Last().StartsWith(GEOMETRYEND_TOKEN));
+            }
+            finally
+            {
+                streamReader.Close();
+            }
+
             var models = new List<Model>();
-            for (int i = 0; i < geometrySection.Length; i++)
+            for (int i = 0; i < geometrySection.Count; i++)
             {
                 if (geometrySection[i].StartsWith(LAYER_TOKEN))
                 {
@@ -219,9 +555,9 @@ namespace CommonLayerInterface.Utils
                             var n = int.Parse(args[1]);
                             for (int j = 0; j < 4 * n; j += 4)
                                 points.Add(new PointHatch(
-                                    float.Parse(args[j + 2]), 
-                                    float.Parse(args[j + 3]), 
-                                    float.Parse(args[j + 4]), 
+                                    float.Parse(args[j + 2]),
+                                    float.Parse(args[j + 3]),
+                                    float.Parse(args[j + 4]),
                                     float.Parse(args[j + 5])));
                             hatch.Points = points;
                             var model = models.SingleOrDefault(m => m.ID == id);
@@ -247,25 +583,25 @@ namespace CommonLayerInterface.Utils
             return geometry;
         }
 
-        private static Geometry GetGeometryBinary(string fileContents)
+        private static Geometry GetGeometryBinary(Stream stream)
         {
             Geometry geometry = new();
             var models = new List<Model>();
             Layer layer;
             Model model;
 
-            var headerEndLocation = fileContents.IndexOf(HEADEREND_TOKEN) + HEADEREND_TOKEN.Length;
-            using (var fs = new FileStream("sample files\\VulcanFormsSamplePartA.cli", FileMode.Open))
-            using (var reader = new BinaryReader(fs))
+            //var headerEndLocation = fileContents.IndexOf(HEADEREND_TOKEN) + HEADEREND_TOKEN.Length;
+            //using (var fs = new FileStream("sample files\\VulcanFormsSamplePartA.cli", FileMode.Open))
+            var reader = new BinaryReader(stream);
+            try
             {
                 float z = float.NaN;
-                reader.BaseStream.Position = headerEndLocation;
+                //reader.BaseStream.Position = headerEndLocation;
                 do
                 {
                     var command = reader.ReadUInt16();
                     switch (command)
                     {
-
                         case 127: // Layer 4B
                             {
                                 z = reader.ReadSingle();
@@ -286,7 +622,7 @@ namespace CommonLayerInterface.Utils
                                 var dir = (Direction)reader.ReadInt32();
                                 var n = reader.ReadInt32();
                                 var args = Enumerable.Range(0, n * 2).Select(_ => reader.ReadSingle()).ToArray();
-                                for (int j = 0; j < args.Length ; j += 2)
+                                for (int j = 0; j < args.Length; j += 2)
                                     points.Add(new Point2D(args[j], args[j + 1]));
                                 polyLine.Direction = dir;
                                 polyLine.Points = points;
@@ -340,6 +676,10 @@ namespace CommonLayerInterface.Utils
                     }
                 } while (reader.BaseStream.Position != reader.BaseStream.Length);
 
+            }
+            finally
+            {
+                reader.Close();
             }
             geometry.Models = models;
             return geometry;
