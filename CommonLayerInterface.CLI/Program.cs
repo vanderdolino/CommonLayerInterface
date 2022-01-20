@@ -1,60 +1,28 @@
 ﻿using System;
 using CommonLayerInterface.Utils;
+using CommonLayerInterface.Classes;
 
-namespace MyApp // Note: actual namespace depends on the project name.
+namespace CommonLayerInterface.CLI // Note: actual namespace depends on the project name.
 {
     internal class Program
     {
         static void Main(string[] args)
         {
-
-            CommonLayerInterfaceFile file;
-            //file = CommonLayerInterfaceFactory.CreateCommonLayerInterfaceFile("sample files\\box_cli_ascii.cli");
-            //file = CommonLayerInterfaceFactory.CreateCommonLayerInterfaceFile("sample files\\VulcanFormsSamplePartI.cli");
-            
-
-            var files = Directory.GetFiles("sample files");
-            foreach (var fileName in files)
+            var runWithArgs = args.Any();
+            var fileNames = new List<string>();
+            var verbose = args.Any(a => a.ToUpper() == "-V");
+            foreach (var arg in args)
             {
-                file = CommonLayerInterfaceFactory.CreateCommonLayerInterfaceFile(fileName);
-                process(file);
+                if (arg.ToUpper() != "-V")
+                    fileNames.Add(Path.GetFullPath(arg));
             }
+
+            var files = fileNames.Select(fileName => CommonLayerInterfaceFactory.CreateCommonLayerInterfaceFile(fileName)).ToList();
+
+            foreach (var file in files)
+                file.PrintToConsole(verbose);
 
             Console.ReadLine();
-        }
-
-        private static void process(CommonLayerInterfaceFile file)
-        {
-            // required parameters
-            Console.WriteLine($"FileType: {file.Header.FileType}");
-            Console.WriteLine($"Units: {file.Header.Units}");
-            Console.WriteLine($"Version: {file.Header.Version}");
-            // optional parameters
-            Console.WriteLine($"Date: {file.Header.Date}");
-            Console.WriteLine($"Dimension: {file.Header.Dimension}");
-            Console.WriteLine($"Layers: {file.Header.Layers}");
-            Console.WriteLine($"Align: {file.Header.Align}");
-            foreach (var label in file.Header.Labels)
-                Console.WriteLine($"Label: {label}");
-            Console.WriteLine($"UserData: {file.Header.UserData}");
-            foreach (var model in file.Geometry.Models)
-            {
-                //Console.WriteLine($"Model ID: {model.ID}, Layers: {model.Layers.Count}");
-                //foreach (var layer in model.Layers)
-                //{
-                    //Console.WriteLine($"\tLayer PolyLines: {layer.PolyLines.Count}, Z: {layer.Z}, Area: {layer.Area}, Perimiter: {layer.Perimiter}");
-                    //foreach (var polyLine in layer.PolyLines)
-                    //{
-                    //    Console.WriteLine($"\t\tPolyLine Points: {polyLine.Points.Count()}, Direction: {polyLine.Direction}, Area: {polyLine.Area}, Perimeter: {polyLine.Perimiter}");
-                    //}
-                //}
-                for(int i = 0; i < model.Layers.Count; i++)
-                {
-                    var layer = model.Layers[i];
-                    Console.WriteLine($"Layer index: {i}, Layer height: {layer.Z}, Layer part area: {layer.Area}");
-                }
-                
-            }
         }
     }
 }

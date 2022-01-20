@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CommonLayerInterface.CLI": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Users\\danverdolino\\source\\repos\\vanderdolino\\CommonLayerInterface\\CommonLayerInterface.CLI\\Sample Files\\box_cli_ascii.cli\" \"C:\\Users\\danverdolino\\source\\repos\\vanderdolino\\CommonLayerInterface\\CommonLayerInterface.CLI\\Sample Files\\box_cli_bin.cli\" -v"
+    }
+  }
+}
