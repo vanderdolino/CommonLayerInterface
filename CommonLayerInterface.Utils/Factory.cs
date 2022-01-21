@@ -26,6 +26,11 @@ namespace CommonLayerInterface.Utils
 
         private CommonLayerInterfaceFactory() { }
 
+        /// <summary>
+        /// Create a <see cref="CommonLayerInterfaceFile"/> from the path to the .cli file
+        /// </summary>
+        /// <param name="filename">The path to the .cli file</param>
+        /// <returns>A <see cref="CommonLayerInterfaceFile"/></returns>
         public static CommonLayerInterfaceFile CreateCommonLayerInterfaceFile(string filename)
         {
             var file = new CommonLayerInterfaceFile();
@@ -391,7 +396,7 @@ namespace CommonLayerInterface.Utils
         }
 
         /// <summary>
-        /// 
+        /// Compares z with z using rounding
         /// </summary>
         /// <param name="z1"></param>
         /// <param name="z2"></param>
