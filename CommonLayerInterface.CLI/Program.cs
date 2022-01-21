@@ -2,7 +2,7 @@
 using CommonLayerInterface.Utils;
 using CommonLayerInterface.Classes;
 
-namespace CommonLayerInterface.CLI // Note: actual namespace depends on the project name.
+namespace CommonLayerInterface.CLI 
 {
     internal class Program
     {
@@ -14,7 +14,9 @@ namespace CommonLayerInterface.CLI // Note: actual namespace depends on the proj
             {
                 try
                 {
-                    fileNames.Add(Path.GetFullPath(arg));
+                    if (File.Exists(arg))
+                        fileNames.Add(arg);
+                    else throw new FileNotFoundException();
                 }
                 catch
                 {
@@ -25,8 +27,6 @@ namespace CommonLayerInterface.CLI // Note: actual namespace depends on the proj
             Console.WriteLine("Press any key to exit.");
             Console.Read();
         }
-
-        private static bool ReadLineIsY() => Console.ReadLine()?.ToUpper() == "Y";
 
         private static void ProcessFiles(IEnumerable<string> fileNames, bool verbose)
         {

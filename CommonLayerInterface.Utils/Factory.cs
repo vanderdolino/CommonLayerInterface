@@ -253,11 +253,11 @@ namespace CommonLayerInterface.Utils
             var layer = model.Layers.SingleOrDefault(l => zEqualityPredicate(l.Z, z.Unitize(header.Units)));
             if (layer == null)
             {
-                layer = new Layer(z, header.Units, layerIndex);
+                layer = new Layer(z, header.Units, layerIndex, CommandType.HatchAscii);
                 layerIndex++;
                 model.Layers.Add(layer);
             }
-            layer.Hatches.Add(hatch);
+            layer.AddHatch(hatch);
         }
 
         private static void ProcessPolyLineAscii(Header header, List<string> geometrySection, List<Model> models, int i, float z, ref int layerIndex)
@@ -279,11 +279,11 @@ namespace CommonLayerInterface.Utils
             var layer = model.Layers.SingleOrDefault(l => zEqualityPredicate(l.Z, z.Unitize(header.Units)));
             if (layer == null)
             {
-                layer = new Layer(z, header.Units, layerIndex);
+                layer = new Layer(z, header.Units, layerIndex, CommandType.PolyLineAscii);
                 layerIndex++;
                 model.Layers.Add(layer);
             }
-            layer.PolyLines.Add(polyLine);
+            layer.AddPolyLine(polyLine);
         }
 
         private static void ProcessLayerBinary(BinaryReader reader, ref float z, CommandType command)
@@ -306,15 +306,18 @@ namespace CommonLayerInterface.Utils
         {
             Func<int> parameterReader;
             Func<float> valueReader;
+            CommandType layerCommand;
             switch (command)
             {
                 case CommandType.PolyLineShort:
                     parameterReader = () => reader.ReadUInt16();
                     valueReader = () => reader.ReadUInt16();
+                    layerCommand = CommandType.LayerShort;
                     break;
                 case CommandType.PolyLineLong:
                     parameterReader = () => reader.ReadInt32();
                     valueReader = () => reader.ReadSingle();
+                    layerCommand = CommandType.LayerLong;
                     break;
                 default:
                     // it's really impossible to get here
@@ -337,26 +340,29 @@ namespace CommonLayerInterface.Utils
             var layer = model.Layers.SingleOrDefault(l => zEqualityPredicate(l.Z, z.Unitize(header.Units)));
             if (layer == null)
             {
-                layer = new Layer(z, header.Units, layerIndex);
+                layer = new Layer(z, header.Units, layerIndex, layerCommand);
                 layerIndex++;
                 model.Layers.Add(layer);
             }
-            layer.PolyLines.Add(polyLine);
+            layer.AddPolyLine(polyLine);
         }
 
         private static void ProcessHatchBinary(Header header, BinaryReader reader, List<Model> models, float z, CommandType command, ref int layerIndex)
         {
             Func<int> parameterReader;
             Func<float> valueReader;
+            CommandType layerCommand;
             switch (command)
             {
                 case CommandType.HatchShort:
                     parameterReader = () => reader.ReadUInt16();
                     valueReader = () => reader.ReadUInt16();
+                    layerCommand = CommandType.LayerShort;
                     break;
                 case CommandType.HatchLong:
                     parameterReader = () => reader.ReadInt32();
                     valueReader = () => reader.ReadSingle();
+                    layerCommand = CommandType.LayerLong;
                     break;
                 default:
                     // it's really impossible to get here
@@ -378,10 +384,10 @@ namespace CommonLayerInterface.Utils
             var layer = model.Layers.SingleOrDefault(l => zEqualityPredicate(l.Z, z.Unitize(header.Units)));
             if (layer == null)
             {
-                layer = new Layer(z, header.Units, layerIndex);
+                layer = new Layer(z, header.Units, layerIndex, layerCommand);
                 model.Layers.Add(layer);
             }
-            layer.Hatches.Add(hatch);
+            layer.AddHatch(hatch);
         }
 
         /// <summary>
